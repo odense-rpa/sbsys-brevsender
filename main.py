@@ -6,6 +6,7 @@ import sbsip
 from datafordeler import Datafordeler
 import argparse
 
+from process.word_template import get_placeholders
 from process.config import get_excel_mapping, load_excel_mapping, get_regler
 
 from automation_server_client import (
@@ -24,21 +25,39 @@ async def populate_queue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
 
     logger.info("Hello from populate workqueue!")
-
-    #TODO: indsæt item i queue for at kunne teste excel
-    load_excel_mapping(os.getenv("EXCEL_MAPPING_PATH"))
     mapping = get_excel_mapping()
-    logger.info(f"Fundne worksheets: {list(mapping.keys())}")
 
+
+    # henter navn på på excel ark ved at finde ... 
     sheet_name = next(iter(mapping.keys()))
     borgere = mapping[sheet_name]
 
-    #TODO: right now the for loop is veru specific, but is there a way to make it more generic? Should i list all possible scenarios of column names?
-    for borger in borgere:
-        cpr = borger.get("CPR", "")
-        navn = borger.get("Navn", "")
-        adresse = borger.get("Adresse", "") 
+    # henter obligatoriske felter / tuborgklammer i word brev
+    obligatoriske_data = get_placeholders(args.word_template)
 
+    # henter navn for hver kolonne (eks cpr, adresse, navn osv)
+    excel_kolonner = {
+        kolonne.strip().upper()
+        for kolonne in borgere[0].keys()
+    }
+
+    manglende_kolonner = obligatoriske_data - excel_kolonner
+
+    if manglende_kolonner:
+        raise ValueError(
+            "Uoverenstemmelse mellem obligatoriske felter i brevet og tilgængelige kolonner i excel"
+            f"Manglende kollone i excel: {', '.join(sorted(manglende_kolonner))}"
+        )
+
+    for borger in borgere:
+        data = {
+            felt: borger.get(felt, "")
+            for felt in obligatoriske_data
+        }
+
+    #TODO: Brug datafordeler metode til et eller andet som andreas sagde jeg skulle
+    #TODO: Tag og gem nødvendig data og send ned til process_workqueue
+    #TODO: Tjek i BluePrism om jeg har fulgt nogenlunde korrekt fremgangsmåde
 
     print("hej")
 
@@ -54,6 +73,8 @@ async def process_workqueue(workqueue: Workqueue):
 
             try:
                 # Process the item here
+
+                #TODO: Brug data og indsæt i word brev ( test_datafordeler.docx ). Måske noget sikring om det er rigtige data inden? noget sammenligning? idk. Andreas sagde at de nogle gange gerne vil sende til en adresse som muligvis ikke står som nuværende adresse eksempeltvis.
 
 
                 pass
@@ -92,7 +113,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--word-template",
-        default="input/brev_template.docx",
+        default=os.environ.get("WORD_TEMPLATE_PATH"),
         help="Path to the Word template for letter generation",
     )
     args = parser.parse_args()
