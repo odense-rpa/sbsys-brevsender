@@ -21,6 +21,9 @@ proces_navn = "SBSYS-brevsender"
 fordeler: Datafordeler
 
 
+    #TODO: vigtigt at brev der ikke har brug for placeholders stadig kan sendes
+
+
 async def populate_queue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ async def populate_queue(workqueue: Workqueue):
     mapping = get_excel_mapping()
 
 
-    # henter navn på på excel ark ved at finde ... 
+    # henter navn på på excel ark
     sheet_name = next(iter(mapping.keys()))
     borgere = mapping[sheet_name]
 
@@ -41,23 +44,42 @@ async def populate_queue(workqueue: Workqueue):
         for kolonne in borgere[0].keys()
     }
 
+    if "CPR" not in excel_kolonner:
+        raise ValueError (
+            "Manglende CPR kolonne i excel"
+        )
+
+
+    # sammenlign placeholders og excel kolloner
+    # hvis der er flere excel kolonner end placeholders i brevet, bliver de ignoreret, da de ikke er en del af obligatoriske_data
     manglende_kolonner = obligatoriske_data - excel_kolonner
+
 
     if manglende_kolonner:
         raise ValueError(
-            "Uoverenstemmelse mellem obligatoriske felter i brevet og tilgængelige kolonner i excel"
+           "Uoverenstemmelse mellem obligatoriske felter i brevet og tilgængelige kolonner i excel"
             f"Manglende kollone i excel: {', '.join(sorted(manglende_kolonner))}"
         )
 
+    # normalisere og trækker data ud for hvert enkelte borger i excel
     for borger in borgere:
-        data = {
-            felt: borger.get(felt, "")
-            for felt in obligatoriske_data
+        normaliseret_borger = {
+            kolonne.strip().upper(): værdi
+            for kolonne, værdi in borger.items()
         }
 
-    #TODO: Brug datafordeler metode til et eller andet som andreas sagde jeg skulle
-    #TODO: Tag og gem nødvendig data og send ned til process_workqueue
-    #TODO: Tjek i BluePrism om jeg har fulgt nogenlunde korrekt fremgangsmåde
+        borger_data = {
+            felt: normaliseret_borger.get(felt, "")
+            for felt in obligatoriske_data
+        }
+        cpr = borger["CPR"]
+
+        data = {"borger_data": borger_data, "borger": cpr}
+    
+        # tjek om item allerede er i kø inden det bliver sendt ned til process
+        if not workqueue.get_item_by_reference(cpr, status=WorkItemStatus.IN_PROGRESS):
+            workqueue.add_item(data=data, reference=str(borger["CPR"]))
+
 
     print("hej")
 
@@ -70,14 +92,33 @@ async def process_workqueue(workqueue: Workqueue):
     for item in workqueue:
         with item:
             data = item.data  # Item data deserialized from json as dict
+            cpr = data["borger_data"]["CPR"]
 
             try:
-                # Process the item here
 
-                #TODO: Brug data og indsæt i word brev ( test_datafordeler.docx ). Måske noget sikring om det er rigtige data inden? noget sammenligning? idk. Andreas sagde at de nogle gange gerne vil sende til en adresse som muligvis ikke står som nuværende adresse eksempeltvis.
+                # hvis borger har manglende data, skal item fejle i proces, så det kommer i rapporten, og de manuelt selv må sende brevet i stedet
+                manglende_værdier = {
+                    felt
+                    for felt, værdi in data["borger_data"].items()
+                    if værdi is None or not str(værdi).strip()
+                }
+                if manglende_værdier:
+                    raise ValueError(
+                        f"Borger med CPR {cpr} mangler obligatoriske værdier"
+                    )
 
 
-                pass
+                #TODO: brug datafordeler til at se om borger er død
+
+
+
+                #TODO: post nr ok?
+
+                
+
+                #TODO: Brug data og indsæt i word brev ( test_datafordeler.docx ). Måske noget sikring om det er rigtige data inden
+
+
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
                 logger.error(f"Error processing item: {data}. Error: {e}")
