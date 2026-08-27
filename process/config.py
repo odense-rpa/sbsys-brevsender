@@ -1,8 +1,8 @@
 from typing import Dict, List
 from openpyxl import load_workbook
 
-# Denne fil er til at håndtere excel mapping. 
-# Den indlæser en excel fil og gemmer mappingen i en global variabel, som kan hentes med get_excel_mapping. 
+# Denne fil er til at håndtere excel mapping.
+# Den indlæser en excel fil og gemmer mappingen i en global variabel, som kan hentes med get_excel_mapping.
 # Derudover er der en funktion get_regler, som henter værdierne fra "Liste" arket i excel filen.
 
 
@@ -62,7 +62,7 @@ def load_excel_mapping(file_path: str, mapping_type: str = "excel"):
             if not headers:
                 # If the header row contains no explicit headers (e.g., empty or merged cells),
                 # create placeholder headers for each column so data rows are still captured.
-                headers = [f"col_{i+1}" for i in range(worksheet.max_column)]
+                headers = [f"col_{i + 1}" for i in range(worksheet.max_column)]
 
             # Initialize list for rows
             rows = []
@@ -113,7 +113,11 @@ def get_regler() -> List[str]:
     liste_rows = mapping.get("Liste")
     if not liste_rows:
         liste_rows = next(
-            (rows for name, rows in mapping.items() if name and name.strip().lower() == "liste"),
+            (
+                rows
+                for name, rows in mapping.items()
+                if name and name.strip().lower() == "liste"
+            ),
             [],
         )
     # Final fallback to lowercase key if present
