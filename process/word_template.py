@@ -11,6 +11,6 @@ def get_placeholders(document_path: str) -> list[str]:
 
     pattern = r"\{\{(.*?)\}\}"
 
-    placeholders = {match.strip().upper() for match in re.findall(pattern, text)}
+    placeholders = {match.strip() for match in re.findall(pattern, text)}
 
     return placeholders

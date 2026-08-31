@@ -7,7 +7,6 @@ import sbsip
 from automation_server_client import WorkItemError
 
 
-
 class BrevService:
     # ---------------------------//----------------------------- #
     # Udfyld selv tomme felter, inden du bruger SBSYS Brevsender #
@@ -15,13 +14,14 @@ class BrevService:
 
     OVERSKRIFT = "Testbrev"
     BESKRIVELSE = "Annes testbrev med SBSYS brevsender i RPA teamet i Odense Kommune"
-    # kun påkrævet, hvis der skal oprettes sag:
+    # skabelon id er kun påkrævet, hvis der skal oprettes sag:
     SBSYS_SKABELON_ID = ""
 
     # ---------------------------//----------------------------- #
 
     @staticmethod
     def _flet_brev(fil_sti: str, brev_felter: dict):
+        print(brev_felter)
         try:
             with open(fil_sti, "rb") as f:
                 response = httpx.post(
