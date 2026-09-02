@@ -6,7 +6,7 @@ import sbsip
 import argparse
 
 from datafordeler import Datafordeler
-from process.word_template import get_placeholders
+from process.word_service import get_placeholders
 from process.config import get_excel_mapping, load_excel_mapping
 from process.brev_service import BrevService
 from odk_tools.tracking import Tracker
@@ -24,12 +24,19 @@ from automation_server_client import (
 proces_navn = "SBSYS-brevsender"
 fordeler: Datafordeler
 
+# ---------------------------//----------------------------- #
+# Udfyld selv tomme felter, inden du bruger SBSYS Brevsender #
+# ---------------------------//----------------------------- #
+OVERSKRIFT = "Testbrev"
+BESKRIVELSE = "Annes testbrev med SBSYS brevsender i RPA teamet i Odense Kommune"
+# skabelon id er kun påkrævet, hvis der skal oprettes sag:
+SBSYS_SKABELON_ID = ""
+
 # -----------------------------------//----------------------- #
 # Hvis du skal oprette sag på brev, skal sag_på_brev være true #
 # -----------------------------------//----------------------- #
 sag_på_brev = False
 # -----------------------------------//----------------------- #
-
 
 async def populate_queue(workqueue: Workqueue):
     # breve, hvor der ikke er brug for placeholders, går igennem med en borger ved kun at gemme cpr til item
@@ -48,11 +55,6 @@ async def populate_queue(workqueue: Workqueue):
         placeholder.strip() for placeholder in get_placeholders(args.word_template)
     }
 
-    # bruges til validering med excel kolonner
-    obligatoriske_data_upper = {
-        placeholder.upper() for placeholder in obligatoriske_data
-    }
-
     # henter navn for hver kolonne (eks cpr, adresse, navn osv)
     excel_kolonner = {kolonne.strip().upper() for kolonne in borgere[0].keys()}
 
@@ -60,8 +62,12 @@ async def populate_queue(workqueue: Workqueue):
         raise ValueError("Manglende CPR kolonne i excel")
 
     # sammenlign placeholders og excel kolloner
-    # hvis der er flere excel kolonner end placeholders i brevet, bliver de ignoreret, da de ikke er en del af obligatoriske_data
-    manglende_kolonner = obligatoriske_data_upper - excel_kolonner
+    manglende_kolonner = []
+
+    for felt in obligatoriske_data:
+        if felt.upper() not in excel_kolonner:
+            manglende_kolonner.append(felt)
+
     if manglende_kolonner:
         raise ValueError(
             "Uoverenstemmelse mellem obligatoriske felter i brevet og tilgængelige kolonner i excel"
@@ -78,7 +84,7 @@ async def populate_queue(workqueue: Workqueue):
             felt: normaliseret_borger.get(felt.upper(), "")
             for felt in obligatoriske_data
         }
-        # vi skal altid bruge cpr, derfor gemmes cpr seperat, da brevet kan være foruden placeholders
+        # vi skal altid bruge cpr, derfor gemmes cpr også seperat, da brevet kan være foruden placeholders
         cpr = borger["CPR"].replace("-", "")
 
         data = {
@@ -115,18 +121,25 @@ async def process_workqueue(workqueue: Workqueue):
 
                 personoplysninger = fordeler.hent_personoplysninger(cpr)
                 if personoplysninger["Person"]["status"] == "doed":
-                    raise ValueError(f"Borger er registreret død")
+                    raise WorkItemError(f"Borger er registreret død")
 
                 borger_adresse, borger_post_nr = fordeler.hent_adresse_til_sbsip(cpr)
 
-                # send brev - husk at tjek, om du skal lave sag eller ej
-                BrevService.flet_og_send_brev(
-                    fil_sti=args.word_template,
-                    brev_felter=data["borger_data"],
-                    cpr=cpr,
-                    post_nr=borger_post_nr,
-                    adresse=borger_adresse,
-                )
+                try:
+                    # send brev - husk at tjek, om du skal lave sag eller ej
+                    BrevService.flet_og_send_brev(
+                        fil_sti=args.word_template,
+                        brev_felter=data["borger_data"],
+                        cpr=cpr,
+                        post_nr=borger_post_nr,
+                        adresse=borger_adresse,
+                        overskrift=OVERSKRIFT,
+                        beskrivelse=BESKRIVELSE,
+                        sbsys_skabelon_id=SBSYS_SKABELON_ID if sag_på_brev else ""
+                    )
+                except:
+                    raise WorkItemError(f"Brev kunne ikke sendes")
+
 
                 report("sbsys-brevsender", "Brev sendt", {"CPR": cpr})
 
@@ -137,8 +150,6 @@ async def process_workqueue(workqueue: Workqueue):
 
                 logger.error(f"Error processing item: {data}. Error: {e}")
                 item.fail(str(e))
-
-            # TODO: Snak med Andreas om korrekt rapportering
 
 
 if __name__ == "__main__":
@@ -194,15 +205,6 @@ if __name__ == "__main__":
         if not args.excel_file:
             parser.error("--excel-file is required for populate_queue")
 
-        # ------------------------------------//--------------------------------------
-        # fail safes mod ikke at have udfyldt tomme felter
-        if not all([BrevService.OVERSKRIFT.strip(), BrevService.BESKRIVELSE.strip()]):
-            parser.error("Mangler at udfyld overskrift beskrivelse i brev_service")
-
-        if sag_på_brev == True and not BrevService.SBSYS_SKABELON_ID:
-            parser.error("mangler obligatorisk SBSYS skabelons id")
-
-        # ------------------------------------//--------------------------------------
 
         # Load excel mapping data (skip validation for Windows paths on Linux)
         if os.path.isfile(args.excel_file):
@@ -213,6 +215,15 @@ if __name__ == "__main__":
         workqueue.clear_workqueue(WorkItemStatus.NEW)
         asyncio.run(populate_queue(workqueue))
         exit(0)
+
+
+    # ------------------------------------//--------------------------------------
+    # fail safes mod ikke at have udfyldt tomme felter
+    if not all([OVERSKRIFT.strip(), BESKRIVELSE.strip()]):
+        parser.error("Mangler at udfyld overskrift beskrivelse i brev_service")
+    if sag_på_brev == True and not SBSYS_SKABELON_ID:
+        parser.error("mangler obligatorisk SBSYS skabelons id")
+    # ------------------------------------//--------------------------------------
 
     # Process workqueue
     asyncio.run(process_workqueue(workqueue))
