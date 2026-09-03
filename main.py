@@ -21,22 +21,27 @@ from automation_server_client import (
     WorkItemStatus,
 )
 
-proces_navn = "SBSYS-brevsender"
-fordeler: Datafordeler
-
+# dine dokumenter med word og excel, indsættes i din .env fil
 # ---------------------------//----------------------------- #
+
 # Udfyld selv tomme felter, inden du bruger SBSYS Brevsender #
 # ---------------------------//----------------------------- #
-OVERSKRIFT = "Testbrev"
-BESKRIVELSE = "Annes testbrev med SBSYS brevsender i RPA teamet i Odense Kommune"
+# overskrift på brevet
+OVERSKRIFT = ""
+# beskrivelse af brevet
+BESKRIVELSE = ""
 # skabelon id er kun påkrævet, hvis der skal oprettes sag:
 SBSYS_SKABELON_ID = ""
+# ---------------------------//----------------------------- #
 
-# -----------------------------------//----------------------- #
 # Hvis du skal oprette sag på brev, skal sag_på_brev være true #
-# -----------------------------------//----------------------- #
+# ----------------------------//------------------------------ #
 sag_på_brev = False
-# -----------------------------------//----------------------- #
+# ----------------------------//------------------------------ #
+
+
+proces_navn = "SBSYS-brevsender"
+fordeler: Datafordeler
 
 async def populate_queue(workqueue: Workqueue):
     # breve, hvor der ikke er brug for placeholders, går igennem med en borger ved kun at gemme cpr til item

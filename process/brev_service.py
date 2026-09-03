@@ -12,11 +12,6 @@ class BrevService:
 
     @staticmethod
     def flet_og_send_brev(fil_sti: str, brev_felter: dict, cpr: str, post_nr, adresse: str, overskrift: str, beskrivelse: str, sbsys_skabelon_id: str = ""):
-        """Render the template, write PDF, validate address, send and cleanup.
-
-        This consolidates rendering and sending into one method and preserves
-        previous error semantics.
-        """
         # Render brev
         try:
             with open(fil_sti, "rb") as f:

@@ -3,7 +3,6 @@ from openpyxl import load_workbook
 
 # Denne fil er til at håndtere excel mapping.
 # Den indlæser en excel fil og gemmer mappingen i en global variabel, som kan hentes med get_excel_mapping.
-# Derudover er der en funktion get_regler, som henter værdierne fra "Liste" arket i excel filen.
 
 
 # Global mappings - each contains workbook name -> list of row dictionaries
@@ -100,26 +99,3 @@ def load_excel_mapping(file_path: str, mapping_type: str = "excel"):
         raise RuntimeError(
             f"Failed to load mapping from Excel file '{file_path}': {str(e)}"
         ) from e
-
-
-def get_regler() -> List[str]:
-    """Return the list of values from the 'Liste' worksheet.
-
-    This function returns the first non-empty cell value from each row in the
-    'Liste' sheet (or 'liste' variant). Raises ValueError if no values are found.
-    """
-    mapping = get_excel_mapping()
-    # Case-insensitive lookup for 'Liste' sheet name
-    liste_rows = mapping.get("Liste")
-    if not liste_rows:
-        liste_rows = next(
-            (
-                rows
-                for name, rows in mapping.items()
-                if name and name.strip().lower() == "liste"
-            ),
-            [],
-        )
-    # Final fallback to lowercase key if present
-    if not liste_rows:
-        liste_rows = mapping.get("liste", [])
