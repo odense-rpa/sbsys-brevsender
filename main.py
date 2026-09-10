@@ -225,7 +225,7 @@ if __name__ == "__main__":
     # ------------------------------------//--------------------------------------
     # fail safes mod ikke at have udfyldt tomme felter
     if not all([OVERSKRIFT.strip(), BESKRIVELSE.strip()]):
-        parser.error("Mangler at udfyld overskrift beskrivelse i brev_service")
+        parser.error("Mangler at udfyld overskrift beskrivelse")
     if sag_på_brev == True and not SBSYS_SKABELON_ID:
         parser.error("mangler obligatorisk SBSYS skabelons id")
     # ------------------------------------//--------------------------------------
