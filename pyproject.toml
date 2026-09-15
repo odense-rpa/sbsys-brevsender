@@ -1,5 +1,5 @@
 [project]
-name = "process-template"
+name = "sbsys-brevsender"
 version = "0.3.0"
 description = "Add your description here"
 readme = "README.md"
