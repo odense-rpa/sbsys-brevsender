@@ -5,7 +5,7 @@ import sys
 import sbsip
 import argparse
 
-from datafordeler import Datafordeler
+from datafordeler import DatafordelerGraphQL
 from sbsys_brevsender.process.word_service import get_placeholders
 from sbsys_brevsender.process.config import get_excel_mapping, load_excel_mapping
 from sbsys_brevsender.process.brev_service import BrevService
@@ -39,7 +39,7 @@ sag_på_brev = False
 
 
 proces_navn = "SBSYS-brevsender"
-fordeler: Datafordeler
+fordeler: DatafordelerGraphQL
 
 async def populate_queue(workqueue: Workqueue):
     # breve, hvor der ikke er brug for placeholders, går igennem med en borger ved kun at gemme cpr til item
@@ -122,11 +122,11 @@ async def process_workqueue(workqueue: Workqueue):
                         f"Borger med CPR: {cpr} mangler obligatoriske værdier"
                     )
 
-                personoplysninger = fordeler.hent_personoplysninger(cpr)
-                if personoplysninger["Person"]["status"] == "doed":
+                person = fordeler.hent_person(cpr)
+                if person.er_død:
                     raise WorkItemError(f"Borger er registreret død")
 
-                borger_adresse, borger_post_nr = fordeler.hent_adresse_til_sbsip(cpr)
+                borger_adresse, borger_post_nr = person.sbsip_adresse()
 
                 try:
                     # send brev - husk at tjek, om du skal lave sag eller ej
@@ -161,6 +161,7 @@ if __name__ == "__main__":
 
     # Initialize external systems for automation here..
     sbsip_credential = Credential.get_credential("SBSip - produktion")
+    datafordeler_credential = Credential.get_credential("Datafordeler")
 
     parser = argparse.ArgumentParser(description=proces_navn)
 
@@ -170,10 +171,9 @@ if __name__ == "__main__":
         help="Udfyld køen og afslut",
     )
 
-    certifikat_sti = os.getenv("CERTIFICATES", "certificates")
-    fordeler = Datafordeler(
-        certifikat_sti=os.path.join(certifikat_sti, "datafordeler.crt"),
-        certifikat_nøglefil=os.path.join(certifikat_sti, "datafordeler.key"),
+    fordeler = DatafordelerGraphQL(
+        client_id=datafordeler_credential.username,
+        client_secret=datafordeler_credential.password,
     )
 
     parser.add_argument(
