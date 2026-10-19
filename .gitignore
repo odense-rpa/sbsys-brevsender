@@ -2,3 +2,7 @@
 .env
 certificates/
 input/
+
+# Python-cachefiler
+__pycache__/
+*.py[cod]
